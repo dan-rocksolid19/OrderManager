@@ -12,7 +12,7 @@ PRINT_ACTION_PRINT = 4
 PRINT_ACTION_PDF = 2
 
 
-def _normalize_date(d: date | datetime) -> date:
+def _normalize_date(d):
     if isinstance(d, datetime):
         return d.date()
     return d
