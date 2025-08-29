@@ -58,13 +58,7 @@ class BootManager:
             if not ensure_database_ready(self.logger):
                 raise BootError("DATABASE_BOOTSTRAP", "Database configuration or connection failed")
             
-            # Stage 2: Auth bootstrap
-            self.current_stage = "AUTH_BOOTSTRAP"
-            self.logger.info("BootManager: Running auth bootstrap")
-            if not ensure_auth_ready(self.ctx, self.smgr, self.logger):
-                raise BootError("AUTH_BOOTSTRAP", "Auth bootstrap failed")
-
-            # Stage 2.5: Due reminders check at startup
+            # Stage 2: Due reminders check at startup
             self.current_stage = "REMINDER_CHECK"
             try:
                 self.logger.info("BootManager: Checking for due calendar reminders at startup")
