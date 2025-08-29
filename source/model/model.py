@@ -14,7 +14,7 @@ from librepy.peewee.peewee import (
 )
 
 
-class Org(BaseOrderModel):
+class Org(BaseModel):
     org_id = AutoField(primary_key=True)
     orgname = CharField(max_length=255)
     phone = CharField(max_length=50, column_name='phone1')
@@ -23,7 +23,7 @@ class Org(BaseOrderModel):
         table_name = 'org'
 
 
-class OrgAddress(BaseOrderModel):
+class OrgAddress(BaseModel):
     addr_id = AutoField(primary_key=True, column_name='gen_addr_id')
     addrtype = CharField(max_length=31, column_name='addresstype')
     org = ForeignKeyField(Org, backref='addresses', column_name='orgid')
@@ -37,7 +37,7 @@ class OrgAddress(BaseOrderModel):
         table_name = 'org_address'
 
 
-class AcctTrans(BaseOrderModel):
+class AcctTrans(BaseModel):
     transtypecode = CharField(max_length=31, column_name='transtypecode')   # FK to acct_trans_type
     transid = AutoField(primary_key=True)
     referencenumber = CharField(max_length=45, null=True, column_name='referencenumber')

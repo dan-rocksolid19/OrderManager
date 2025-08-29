@@ -36,8 +36,8 @@ def apply_pending_migrations(logger, db=None):
     # duration of the migration process.
     with db.connection_context():
         logger.debug("Ensuring schema_migrations table exists")
-        db.execute_sql('CREATE SCHEMA IF NOT EXISTS job_manager')
-        db.execute_sql('SET search_path TO job_manager, public')
+        db.execute_sql('CREATE SCHEMA IF NOT EXISTS order_manager')
+        db.execute_sql('SET search_path TO order_manager, public')
         db.execute_sql('CREATE TABLE IF NOT EXISTS schema_migrations (filename VARCHAR PRIMARY KEY, applied_at TIMESTAMP)')
         
         logger.debug("Querying existing applied migrations")
