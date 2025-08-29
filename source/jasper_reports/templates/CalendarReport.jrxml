@@ -59,10 +59,10 @@ SELECT
     ''
   ) AS events_html
 FROM days d
-LEFT JOIN calendar_entry_order ceo
+LEFT JOIN order_manager.calendar_entry_order ceo
   ON COALESCE(ceo.start_date, ceo.end_date)::date <= d.cell_date
  AND COALESCE(ceo.end_date,   ceo.start_date)::date >= d.cell_date
-LEFT JOIN calendar_entry_status ces
+LEFT JOIN order_manager.calendar_entry_status ces
   ON ces.status_id = ceo.status_id
 GROUP BY d.cell_date, idx, day_no
 ORDER BY idx;
