@@ -9,7 +9,7 @@ import importlib.util
 from datetime import datetime, timezone
 from librepy.model.db_connection import get_database_connection
 from librepy.peewee.playhouse.migrate import PostgresqlMigrator
-from librepy.database.migrations import initial_001, create_auth_tables_002, update_hours_table_003, create_events_table_004
+from librepy.database.migrations import initial_001
 
 _APPLIED_DATABASES = set()
 
@@ -46,9 +46,6 @@ def apply_pending_migrations(logger, db=None):
         
         migrations = [
             ('001_initial.py', initial_001),
-            ('002_create_auth_tables.py', create_auth_tables_002),
-            ('003_update_hours_table.py', update_hours_table_003),
-            ('004_create_events_table.py', create_events_table_004)
         ]
         
         pending_migrations = [(name, mod) for name, mod in migrations if name not in existing]

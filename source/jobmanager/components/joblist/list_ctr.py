@@ -1,13 +1,8 @@
 from librepy.pybrex import ctr_container
 from com.sun.star.awt.PosSize import POSSIZE
 from librepy.pybrex.listeners import Listeners
-from librepy.jobmanager.data.request_dao import RequestDAO
-from librepy.jobmanager.data.quote_dao import QuoteDAO
-from librepy.jobmanager.data.job_dao import JobDAO
 from librepy.jobmanager.data.orders_dao import AcctTransDAO
-from librepy.jobmanager.data.invoice_dao import InvoiceDAO
 from librepy.jobmanager.data.settings_dao import SettingsDAO
-from datetime import datetime
 import traceback
 
 class JobList(ctr_container.Container):

@@ -15,22 +15,10 @@ For example, to import a file named config, use the following:
 from librepy import config
 '''
 
-from librepy.model.model import (
-    Customers, Addresses, Documents, DocumentAddress, 
-    Request, Quote, Job, Invoice, Items, Steps
-)
+from librepy.model.model import Org, OrgAddress, AcctTrans, CalendarEntryStatus, CalendarEntryOrder
 
 REQUIRED_MODELS = [
-    Customers,
-    Addresses, 
-    Documents,
-    DocumentAddress,
-    Request,
-    Quote,
-    Job,
-    Invoice,
-    Items,
-    Steps
+    Org, OrgAddress, AcctTrans, CalendarEntryStatus, CalendarEntryOrder
 ]
 
 def verify_and_create_tables(logger, database):

@@ -1,7 +1,7 @@
-from librepy.model.model import Customers, Addresses, Documents, DocumentAddress, Request, Quote, Job, Invoice, Items, Steps, Settings, Crews, Hours
+from librepy.model.model import Org, OrgAddress, AcctTrans, CalendarEntryStatus, CalendarEntryOrder
 
 def migrate(migrator, db):
-    models = [Customers, Addresses, Documents, DocumentAddress, Request, Quote, Job, Invoice, Items, Steps, Settings, Crews, Hours]
+    models = [Org, OrgAddress, AcctTrans, CalendarEntryStatus, CalendarEntryOrder]
     
     original_databases = {}
     for model in models:
