@@ -1,6 +1,5 @@
 # dao_acct_trans.py
 from datetime import date, timedelta
-from typing import List, Optional
 
 from librepy.peewee.peewee import fn, JOIN
 from librepy.model.base_dao import BaseDAO
@@ -28,7 +27,7 @@ class AcctTransDAO(BaseDAO):
         )
 
 
-    def get_sale_order_by_id(self, transid: int):
+    def get_sale_order_by_id(self, transid):
         """Fetch a single SALE order by ID, or None if not found / not SALEORD."""
         m = self.model_class
         return self.safe_execute(
@@ -36,7 +35,7 @@ class AcctTransDAO(BaseDAO):
             lambda: self._sale_q().where(m.transid == transid).get()
         )
 
-    def get_sale_order_with_address_by_id(self, transid: int, preferred_addrtype: str = 'SHIPTO'):
+    def get_sale_order_with_address_by_id(self, transid, preferred_addrtype='SHIPTO'):
         """Fetch a single SALE order by ID with Org and one preferred OrgAddress joined.
         Uses LEFT OUTER JOINs and limits OrgAddress by addrtype to avoid duplicates.
         Falls back to any address if a preferred one is not available.
@@ -136,7 +135,7 @@ class AcctTransDAO(BaseDAO):
             pass
         return o_fb
 
-    def get_preferred_org_address(self, org_id: int, priorities=(
+    def get_preferred_org_address(self, org_id, priorities=(
         'BILLTO', 'BILLING', 'MAILTO', 'MAILING', 'SHIPTO', 'SHIPPING'
     )):
         """Return the preferred OrgAddress for an org_id using a simple priority list.
@@ -168,11 +167,11 @@ class AcctTransDAO(BaseDAO):
     def list_sale_orders(
             self,
             *,
-            org_id: Optional[int] = None,
-            from_date: Optional[date] = None,
-            to_date: Optional[date] = None,
-            newest_first: bool = True,
-    ) -> list[dict]:
+            org_id=None,
+            from_date=None,
+            to_date=None,
+            newest_first=True,
+    ):
         """
         List SALE orders with optional org/date filters.
         Replicates the JobDAO.list_jobs pattern: returns a list of dicts

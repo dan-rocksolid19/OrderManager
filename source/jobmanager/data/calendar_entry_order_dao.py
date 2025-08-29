@@ -1,6 +1,3 @@
-from typing import Optional, List
-from datetime import date
-
 from librepy.model.base_dao import BaseDAO
 from librepy.model.model import CalendarEntryOrder, AcctTrans, Org, CalendarEntryStatus
 from librepy.peewee.peewee import JOIN, fn, SQL
@@ -26,7 +23,7 @@ class CalendarEntryOrderDAO(BaseDAO):
              .join(CalendarEntryStatus, join_type=JOIN.LEFT_OUTER, on=(m.status == CalendarEntryStatus.status_id))
         )
 
-    def get_entries_by_date_range(self, start_date: date, end_date: date) -> list[dict]:
+    def get_entries_by_date_range(self, start_date, end_date):
         """
         List CalendarEntryOrder rows that overlap the [start_date, end_date] range.
         Returns UI-friendly dicts that the calendar can expand per-day.
@@ -38,7 +35,7 @@ class CalendarEntryOrderDAO(BaseDAO):
             # Broad DB-side predicate on start_date to reduce rows; detailed overlap check in Python
             q = q.where(type_pred & (CalendarEntryOrder.start_date <= end_date))
 
-            items: List[dict] = []
+            items = []
             for e in q:
                 s = e.start_date
                 eend = e.end_date or e.start_date
@@ -94,7 +91,7 @@ class CalendarEntryOrderDAO(BaseDAO):
             default_return=[]
         )
 
-    def _to_dict(self, e: CalendarEntryOrder) -> dict:
+    def _to_dict(self, e):
         """Convert a CalendarEntryOrder row (with optional joined order/org) to UI dict."""
         # Guarded access to related order/org
         order_id = getattr(e, 'order_id', None)
@@ -127,7 +124,7 @@ class CalendarEntryOrderDAO(BaseDAO):
             'status_color': (getattr(getattr(e, 'status', None), 'color', '') or '') if getattr(e, 'status', None) else '',
         }
 
-    def get_entry_by_id(self, entry_id: int) -> Optional[dict]:
+    def get_entry_by_id(self, entry_id):
         def _query():
             # Use left joins to fetch optional order/org labels
             q = self._q().where(CalendarEntryOrder.entry_id == entry_id)
@@ -137,7 +134,7 @@ class CalendarEntryOrderDAO(BaseDAO):
             return self._to_dict(e)
         return self.safe_execute(f"get CalendarEntryOrder by id {entry_id}", _query, default_return=None)
 
-    def create_entry(self, data: dict) -> Optional[int]:
+    def create_entry(self, data):
         """Create a new CalendarEntryOrder. Returns new entry_id or None on failure."""
         def _create():
             s = data.get('start_date')
@@ -170,7 +167,7 @@ class CalendarEntryOrderDAO(BaseDAO):
             return obj.entry_id
         return self.safe_execute("create CalendarEntryOrder", _create, default_return=None)
 
-    def update_entry(self, entry_id: int, data: dict) -> bool:
+    def update_entry(self, entry_id, data):
         def _update():
             obj = CalendarEntryOrder.get_or_none(CalendarEntryOrder.entry_id == entry_id)
             if not obj:
@@ -206,7 +203,7 @@ class CalendarEntryOrderDAO(BaseDAO):
             return True
         return self.safe_execute(f"update CalendarEntryOrder {entry_id}", _update, default_return=False)
 
-    def get_due_reminders(self, today: Optional[date] = None) -> List[dict]:
+    def get_due_reminders(self, today=None):
         """
         Return entries whose reminder is due today: start_date - today == days_before.
         Optional `today` allows deterministic testing; when None, the DB current date is used.
@@ -235,7 +232,7 @@ class CalendarEntryOrderDAO(BaseDAO):
 
         return self.safe_execute("list due reminder CalendarEntryOrder entries", _query, default_return=[])
 
-    def delete_entry(self, entry_id: int) -> bool:
+    def delete_entry(self, entry_id):
         def _delete():
             obj = CalendarEntryOrder.get_or_none(CalendarEntryOrder.entry_id == entry_id)
             if not obj:
