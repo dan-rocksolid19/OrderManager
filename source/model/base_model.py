@@ -21,8 +21,9 @@ from librepy.model.db_connection import database
 class BaseModel(Model):
     class Meta:
         database = database
-        schema = 'job_manager'
+        schema = 'public'
 
 class BaseOrderModel(Model):
     class Meta:
         database = database
+        schema = 'order_manager'
