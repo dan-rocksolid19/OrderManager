@@ -25,7 +25,7 @@ class AboutDialog(dialog.DialogBase):
                 x, y,
                 width,
                 self.LABEL_HEIGHT + 4,
-                Label='Job Manager',
+                Label='Order Manager',
                 FontHeight=14,
                 FontWeight=150,
                 TextColor=self.TITLE_COLOR,
@@ -34,7 +34,7 @@ class AboutDialog(dialog.DialogBase):
 
             y += self.LABEL_HEIGHT + 8
 
-            description = 'Job Manager streamlines job tracking, documents and reporting within LibreOffice.'
+            description = 'Order Manager streamlines order tracking and reporting within LibreOffice.'
             self.add_label(
                 'LblDescription',
                 x, y,
