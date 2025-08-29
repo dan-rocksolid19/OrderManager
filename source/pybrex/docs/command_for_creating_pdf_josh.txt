@@ -1,0 +1,6 @@
+1. Make sure you are in the directory where the markdown files are located.
+2. Run the command:
+
+pandoc README.md 1.GettingStarted.md -o Pybrex_Documentation.pdf --pdf-engine=xelatex --toc -V title="PyBrex Documentation" -V author="Joshua" -V date="January 2025" -V mainfont="Arial" -V monofont="DejaVu Sans Mono" -V geometry:margin=0.5in -V listings -V breaklines=true
+
+3. The PDF will be created in the same directory as the markdown files.

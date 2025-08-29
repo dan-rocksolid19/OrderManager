@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+              name="demo_calendar"
+              columnCount="7"
+              printOrder="Horizontal"
+              pageWidth="792"
+              pageHeight="612"
+              orientation="Landscape"
+              whenNoDataType="AllSectionsNoDetail"
+              columnWidth="110"
+              leftMargin="11"
+              rightMargin="11"
+              topMargin="6"
+              bottomMargin="6"
+              uuid="32abf871-39b8-4cc7-b03c-d950a55e2bfb">
+
+    <style name="Style1" forecolor="#050505">
+        <conditionalStyle>
+            <conditionExpression><![CDATA[$F{idx}.intValue()%7==1]]></conditionExpression>
+            <style forecolor="#FA0702"/>
+        </conditionalStyle>
+    </style>
+
+    <parameter name="start_date" class="java.util.Date"/>
+    <parameter name="end_date" class="java.util.Date"/>
+    <parameter name="title" class="java.lang.String"/>
+
+    <queryString>
+        <![CDATA[
+        WITH days AS (
+  SELECT
+    generate_series(
+      CAST($P{start_date} AS date),
+      CAST($P{end_date}   AS date),
+      '1 day'
+    )::date AS cell_date
+)
+SELECT
+  /* 1-based index across the range */
+  ((d.cell_date - CAST($P{start_date} AS date))::int + 1) AS idx,
+  d.cell_date,
+  EXTRACT(DAY FROM d.cell_date)::int AS day_no,
+  COALESCE(
+    string_agg(
+      '<font color="' ||
+      CASE
+        WHEN ces.color IS NULL THEN '#000000'
+        WHEN ces.color ~ '^(#|$)' THEN COALESCE(ces.color, '#000000')
+        ELSE '#' || ces.color
+      END || '">'
+      || replace(replace(replace(ceo.event_name,'&','&amp;'),'<','&lt;'),'>','&gt;')
+      || COALESCE(' [' || ces.status || ']', '')
+      || '</font>',
+      '<br/>'
+      ORDER BY COALESCE(ceo.start_date, ceo.end_date), ceo.entry_id
+    ),
+    ''
+  ) AS events_html
+FROM days d
+LEFT JOIN calendar_entry_order ceo
+  ON COALESCE(ceo.start_date, ceo.end_date)::date <= d.cell_date
+ AND COALESCE(ceo.end_date,   ceo.start_date)::date >= d.cell_date
+LEFT JOIN calendar_entry_status ces
+  ON ces.status_id = ceo.status_id
+GROUP BY d.cell_date, idx, day_no
+ORDER BY idx;
+        ]]>
+    </queryString>
+
+    <field name="idx" class="java.lang.Integer"/>
+    <field name="cell_date" class="java.util.Date"/>
+    <field name="day_no" class="java.lang.Integer"/>
+    <field name="events_html" class="java.lang.String"/>
+
+    <title>
+        <band height="60">
+            <textField pattern="yyyy MMMM">
+                <reportElement x="0" y="0" width="770" height="30"
+                               uuid="21293131-3839-43aa-b449-b19867eee2da"/>
+                <textElement textAlignment="Center">
+                    <font size="16" isBold="true"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$P{title}]]></textFieldExpression>
+            </textField>
+            <staticText>
+                <reportElement mode="Opaque" x="0" y="30" width="110" height="30"
+                               forecolor="#FFFCFC" backcolor="#FC0703"
+                               uuid="11cb3d1f-777b-43cb-a053-11f27f46d99b"/>
+                <textElement textAlignment="Center">
+                    <font size="14" isBold="true"/>
+                </textElement>
+                <text><![CDATA[Sunday]]></text>
+            </staticText>
+            <staticText>
+                <reportElement mode="Opaque" x="110" y="30" width="110" height="30"
+                               forecolor="#FFFCFC" backcolor="#403D3D"
+                               uuid="35ef4490-9b76-4251-bc43-7f59a9ab19c2"/>
+                <textElement textAlignment="Center">
+                    <font size="14" isBold="true"/>
+                </textElement>
+                <text><![CDATA[Monday]]></text>
+            </staticText>
+            <staticText>
+                <reportElement mode="Opaque" x="220" y="30" width="110" height="30"
+                               forecolor="#FFFCFC" backcolor="#403D3D"
+                               uuid="33eb161b-40bb-4a2d-9b85-6ba67461b4f6"/>
+                <textElement textAlignment="Center">
+                    <font size="14" isBold="true"/>
+                </textElement>
+                <text><![CDATA[Tuesday]]></text>
+            </staticText>
+            <staticText>
+                <reportElement mode="Opaque" x="330" y="30" width="110" height="30"
+                               forecolor="#FFFCFC" backcolor="#403D3D"
+                               uuid="5e4c7405-352c-4058-b0ef-bd52d766e00b"/>
+                <textElement textAlignment="Center">
+                    <font size="14" isBold="true"/>
+                </textElement>
+                <text><![CDATA[Wednesday]]></text>
+            </staticText>
+            <staticText>
+                <reportElement mode="Opaque" x="440" y="30" width="110" height="30"
+                               forecolor="#FFFCFC" backcolor="#403D3D"
+                               uuid="81be3ac1-c1c1-4573-86a7-67c891288f1c"/>
+                <textElement textAlignment="Center">
+                    <font size="14" isBold="true"/>
+                </textElement>
+                <text><![CDATA[Thursday]]></text>
+            </staticText>
+            <staticText>
+                <reportElement mode="Opaque" x="550" y="30" width="110" height="30"
+                               forecolor="#FFFCFC" backcolor="#403D3D"
+                               uuid="9442d83e-3726-4db9-8746-04b2fea1449b"/>
+                <textElement textAlignment="Center">
+                    <font size="14" isBold="true"/>
+                </textElement>
+                <text><![CDATA[Friday]]></text>
+            </staticText>
+            <staticText>
+                <reportElement mode="Opaque" x="660" y="30" width="110" height="30"
+                               forecolor="#FFFCFC" backcolor="#403D3D"
+                               uuid="edc883b5-0e35-4e17-8a45-56efc9dacf6a"/>
+                <textElement textAlignment="Center">
+                    <font size="14" isBold="true"/>
+                </textElement>
+                <text><![CDATA[Saturday]]></text>
+            </staticText>
+        </band>
+    </title>
+
+    <detail>
+        <band height="90" splitType="Stretch">
+
+            <frame>
+                <reportElement x="0" y="0" width="110" height="90"
+                               uuid="75440275-c439-4c3e-bb77-f9f4d8f48415"/>
+                <box>
+                    <topPen lineWidth="1.0"/>
+                    <leftPen lineWidth="1.0"/>
+                    <bottomPen lineWidth="1.0"/>
+                    <rightPen lineWidth="1.0"/>
+                </box>
+
+                <!--Events (HTML colored)-->
+                <textField isStretchWithOverflow="true">
+                    <reportElement x="4" y="24" width="102" height="62"/>
+                    <textElement markup="html">
+                        <font size="9"/>
+                    </textElement>
+                    <textFieldExpression><![CDATA[$F{events_html}]]></textFieldExpression>
+                </textField>
+
+                <textField>
+                    <reportElement style="Style1" x="60" y="1" width="50" height="30"
+                                   isRemoveLineWhenBlank="true"
+                                   uuid="733ff549-0109-4f55-b9de-476f0ad9fbeb"/>
+                    <textElement textAlignment="Right">
+                        <font size="16" isBold="true"/>
+                    </textElement>
+                    <textFieldExpression>
+                        <![CDATA[$F{day_no}]]> </textFieldExpression>
+                </textField>
+            </frame>
+        </band>
+    </detail>
+</jasperReport>
