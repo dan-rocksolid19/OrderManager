@@ -66,37 +66,6 @@ class MenubarManager(object):
         dlg = StatusesDialog(self.ctx, self.parent, self.logger)
         dlg.execute()
 
-    def _get_or_recover_current_user(self, auth_service):
-        """
-        Get current user from session, with recovery mechanism if session is lost.
-        
-        Args:
-            auth_service: AuthService instance to use for auto-login attempts
-            
-        Returns:
-            User object if available, None if no user is logged in
-        """
-        from librepy.auth import session
-        
-        # First check if we have a current user
-        if session.current_user is not None:
-            self.logger.debug(f"Current user found: {session.current_user.username}")
-            return session.current_user
-        
-        # If no current user, try auto-login to recover session
-        self.logger.info("No current user found, attempting auto-login recovery")
-        try:
-            recovered_user = auth_service.try_auto_login()
-            if recovered_user:
-                self.logger.info(f"Session recovered via auto-login for user: {recovered_user.username}")
-                return recovered_user
-            else:
-                self.logger.info("Auto-login recovery failed - no valid remember token found")
-                return None
-        except Exception as e:
-            self.logger.error(f"Error during auto-login recovery: {str(e)}")
-            return None
-
     def settings(self, *args):
         """Show settings dialog"""
         from librepy.database import db_dialog
