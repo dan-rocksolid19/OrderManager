@@ -71,7 +71,8 @@ class CalendarEntryOrder(BaseOrderModel):
         AcctTrans,
         unique=True,
         backref='calendar_entry',
-        on_delete='CASCADE'
+        on_delete='CASCADE',
+        null=True,
     )
     reminder = BooleanField(default=False)
     days_before = IntegerField(null=True)
