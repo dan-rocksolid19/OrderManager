@@ -486,16 +486,10 @@ class Calendar(ctr_container.Container):
                         jobs_for_day = week_jobs_data.get(day_num, [])
                         events_for_day = week_events_data.get(day_num, [])
                         
-                        # Jobs have priority - show them first
-                        if item_row_index < len(jobs_for_day):
-                            job = jobs_for_day[item_row_index]
-                            self.create_single_job_button(date, job, x, item_row_y, cell_width, item_button_height, item_row_index, row_index)
-                        else:
-                            # Show events after jobs
-                            event_index = item_row_index - len(jobs_for_day)
-                            if event_index < len(events_for_day):
-                                entry = events_for_day[event_index]
-                                self.create_single_order_entry_button(date, entry, x, item_row_y, cell_width, item_button_height, event_index, row_index)
+                        event_index = item_row_index - len(jobs_for_day)
+                        if event_index < len(events_for_day):
+                            entry = events_for_day[event_index]
+                            self.create_single_order_entry_button(date, entry, x, item_row_y, cell_width, item_button_height, event_index, row_index)
             
             # Calculate total height for this week
             week_total_height = day_label_height + 1 + (max_items_in_week * (item_button_height + item_button_spacing))
@@ -653,21 +647,6 @@ class Calendar(ctr_container.Container):
         self.logger.info(f"Day label clicked: {date} (jobs have individual buttons)")
         pass
 
-    def open_job_for_editing(self, document_id):
-        """Open job dialog for editing"""
-        try:
-            from librepy.jobmanager.components.joblist import job
-            dlg = job.Job(self.parent, self.ctx, self.smgr, self.frame, self.ps, job_id=document_id)
-            result = dlg.execute()
-            
-            if result == 1:  # Job was saved
-                # Reload calendar data to reflect changes
-                self.load_calendar_data()
-                self._create_calendar_grid()
-                
-        except Exception as e:
-            self.logger.error(f"Error opening job for editing: {e}")
-            self.logger.error(traceback.format_exc())
 
     def create_calendar_entry(self, event):
         """Open the Calendar Entry dialog and create a new entry on save."""
@@ -761,19 +740,6 @@ class Calendar(ctr_container.Container):
             self.calendar_data = {}
             self.events_data = {}
 
-    def update_crew_dropdown(self):
-        """Update crew dropdown with crews from database"""
-        try:
-            crews = self.job_dao.get_available_crews()
-            crew_list = ["All"] + crews + ["Events"]
-            self.crew_dropdown.Model.StringItemList = tuple(crew_list)
-            self.crew_dropdown.setText(self.selected_crew)
-            self.logger.info(f"Updated crew dropdown with {len(crews)} crews + Events option")
-        except Exception as e:
-            self.logger.error(f"Error updating crew dropdown: {e}")
-            # Fallback to default crews
-            self.crew_dropdown.Model.StringItemList = ("All", "Crew 1", "Crew 2", "Crew 3", "Events")
-            self.crew_dropdown.setText(self.selected_crew)
 
     def show(self):
         # Load calendar data first
@@ -1045,143 +1011,6 @@ class Calendar(ctr_container.Container):
             'title_height': title_height,
         }
 
-    # def log_out(self, event):
-    #     try:
-    #         from librepy.pybrex.msgbox import confirm_action
-    #         if not confirm_action("Are you sure you want to log out?", "Confirm Logout"):
-    #             return
-    #     except Exception:
-    #         pass
-    #     self.logger.info("Log out clicked")
-    #     if hasattr(self.parent, 'sidebar_manager'):
-    #         try:
-    #             self.parent.sidebar_manager.hide()
-    #         except Exception:
-    #             pass
-    #     self.parent.ui_initialized = False
-    #     self.parent.show_screen('log_in')
-
-    def create_single_job_button(self, date, job, x, y, cell_width, job_button_height, job_row_index, row_index):
-        """Create a single job button for a specific row and position"""
-        try:
-            date_str = date.strftime('%Y-%m-%d')
-            if date_str not in self.job_buttons:
-                self.job_buttons[date_str] = []
-            
-            # Format job button text
-            crew_name = job.get('crew_assigned', 'Unassigned')
-            customer_name = job.get('customer_name', 'Unknown')
-            
-            # Improved text formatting for better readability
-            max_total_length = 18
-            
-            # Format: "Crew1: Customer" or just "Customer" if no crew
-            if crew_name and crew_name != 'Unassigned':
-                # Truncate crew name if too long
-                if len(crew_name) > 10:
-                    crew_display = crew_name[:8] + ".."
-                else:
-                    crew_display = crew_name
-                
-                # Calculate remaining space for customer name
-                prefix_length = len(crew_display) + 2  # +2 for ": "
-                remaining_space = max_total_length - prefix_length
-                
-                if len(customer_name) > remaining_space and remaining_space > 3:
-                    customer_display = customer_name[:remaining_space-2] + ".."
-                else:
-                    customer_display = customer_name
-                
-                button_text = f"{crew_display}: {customer_display}"
-            else:
-                # No crew, use more space for customer name
-                if len(customer_name) > max_total_length:
-                    button_text = customer_name[:max_total_length-2] + ".."
-                else:
-                    button_text = customer_name
-            
-            # Get crew color for this specific job
-            crew_color = self.job_dao.get_crew_color(crew_name)
-            
-            # Use lighter color for text if background is dark
-            text_color = 0xFFFFFF if crew_color in [0x2C3E50, 0xE74C3C, 0x9B59B6] else 0x000000
-            
-            job_button_name = f"jobBtn_{date_str}_{job_row_index}"
-            
-            # Create individual job button
-            job_button = self.add_button(
-                job_button_name,
-                x + 2, y, cell_width - 4, job_button_height,
-                Label=button_text,
-                callback=lambda event, doc_id=job.get('document_id'): self.open_job_for_editing(doc_id),
-                BackgroundColor=crew_color,
-                TextColor=text_color,
-                FontHeight=self.calendar_config['job_font_size'],
-                FontWeight=150,
-                Border=0
-            )
-            
-            self.job_buttons[date_str].append(job_button)
-            self.calendar_buttons[job_button_name] = job_button
-            
-            # Cache job button position with row index
-            self._base_positions[job_button_name] = (x + 2, y, cell_width - 4, job_button_height, row_index)
-            
-        except Exception as e:
-            self.logger.error(f"Error creating job button for {date}: {e}")
-            self.logger.error(traceback.format_exc())
-
-    def create_single_event_button(self, date, event, x, y, cell_width, event_button_height, event_row_index, row_index):
-        """Create a single event button for a specific row and position"""
-        try:
-            date_str = date.strftime('%Y-%m-%d')
-            if date_str not in self.event_buttons:
-                self.event_buttons[date_str] = []
-            
-            # Format event button text
-            title = event.get('title', 'Untitled Event')
-            
-            # Text formatting for events
-            max_total_length = 18
-            
-            # Truncate title if too long
-            if len(title) > max_total_length:
-                button_text = title[:max_total_length-2] + ".."
-            else:
-                button_text = title
-            
-            # Get event status color
-            event_status = event.get('status', 'Pending')
-            event_bg_color = self.events_dao.get_event_status_color(event_status)
-            
-            # Use white text for better contrast
-            text_color = 0xFFFFFF
-            
-            event_button_name = f"eventBtn_{date_str}_{event_row_index}"
-            
-            # Create individual event button
-            event_button = self.add_button(
-                event_button_name,
-                x + 2, y, cell_width - 4, event_button_height,
-                Label=button_text,
-                callback=lambda ev, event_id=event.get('id'): self.open_event_for_editing(event_id),
-                BackgroundColor=event_bg_color,
-                TextColor=text_color,
-                FontHeight=self.calendar_config['job_font_size'],
-                FontWeight=150,
-                Border=0
-            )
-            
-            self.event_buttons[date_str].append(event_button)
-            self.calendar_buttons[event_button_name] = event_button
-            
-            # Cache event button position with row index
-            self._base_positions[event_button_name] = (x + 2, y, cell_width - 4, event_button_height, row_index)
-            
-        except Exception as e:
-            self.logger.error(f"Error creating event button for {date}: {e}")
-            self.logger.error(traceback.format_exc())
-
     def create_single_order_entry_button(self, date, entry, x, y, cell_width, entry_button_height, entry_row_index, row_index):
         """Create a single calendar entry button (order-less) for a specific row and position"""
         try:
@@ -1244,47 +1073,6 @@ class Calendar(ctr_container.Container):
 
         except Exception as e:
             self.logger.error(f"Error creating calendar entry button for {date}: {e}")
-            self.logger.error(traceback.format_exc())
-
-    def open_order_for_viewing(self, order_id):
-        """Open the Order dialog for the given order_id"""
-        try:
-            if order_id is None:
-                self.logger.warn("Order ID is None; cannot open order dialog")
-                return
-            from librepy.jobmanager.components.joblist.order_dlg import OrderDialog
-            dlg = OrderDialog(self, self.ctx, self.smgr, self.frame, self.ps, order_id=order_id)
-            dlg.execute()
-        except Exception as e:
-            self.logger.error(f"Error opening order {order_id}: {e}")
-            self.logger.error(traceback.format_exc())
-
-    def open_event_for_editing(self, event_id):
-        """Open event dialog for editing an existing event"""
-        try:
-            # Get the event from database
-            event = self.events_dao.get_event_by_id(event_id)
-            if not event:
-                from librepy.pybrex.msgbox import MsgBox
-                MsgBox("Event not found.", 16, "Error")
-                return
-            
-            # Import and create the event dialog
-            from librepy.jobmanager.components.calendar.events import EventDialog
-            
-            event_dialog = EventDialog(
-                self, self.ctx, self.smgr, self.frame, self.ps,
-                edit_mode=True, event_data=event
-            )
-            
-            result = event_dialog.execute()
-            if result == 1:  # Event was updated
-                # Reload calendar data to show updated event
-                self.load_calendar_data()
-                self._create_calendar_grid()
-                
-        except Exception as e:
-            self.logger.error(f"Error editing event {event_id}: {e}")
             self.logger.error(traceback.format_exc())
 
     def open_entry_for_editing(self, entry_id):
