@@ -2,7 +2,7 @@ from datetime import datetime
 from librepy.pybrex.dialog import DialogBase
 from librepy.pybrex.msgbox import msgbox, confirm_action
 from librepy.pybrex.uno_date_time_converters import uno_date_to_python, python_date_to_uno
-from librepy.jobmanager.data.calendar_entry_status_dao import CalendarEntryStatusDAO
+from librepy.jobmanager.data.status_dao import StatusDAO
 
 
 class EntryDialog(DialogBase):
@@ -21,7 +21,7 @@ class EntryDialog(DialogBase):
         self.status_items = []  # list of (id, name, color)
         self.status_names = []
         # DAO for statuses (managed DB connection)
-        self.status_dao = CalendarEntryStatusDAO(self.logger)
+        self.status_dao = StatusDAO(self.logger)
         super().__init__(ctx, smgr, **props)
 
     def _create(self):
@@ -66,7 +66,7 @@ class EntryDialog(DialogBase):
 
     def _load_statuses(self):
         try:
-            rows = self.status_dao.list_statuses()
+            rows = self.status_dao.get_all_statuses()
             self.status_items = [(r.status_id, r.status, r.color) for r in rows]
             self.status_names = [r.status for r in rows]
             self.status_combo.Model.StringItemList = tuple(self.status_names)
