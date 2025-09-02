@@ -165,50 +165,6 @@ class JobList(ctr_container.Container):
     def _prepare(self):
         pass
 
-    def _update_tab_buttons(self):
-        """Update button colors based on current active tab"""
-        self.btn_jobs.Model.BackgroundColor = 0x2C3E50
-
-        label_map = {"jobs": "Job"}
-        if hasattr(self, 'lbl_list_title'):
-            self.lbl_list_title.Model.Label = label_map.get(self.current_tab, "Job List")
-    
-    # Create callback methods
-    def create_request(self, event):
-        """Create new request"""
-        self.logger.info("Create Request clicked")
-        from librepy.jobmanager.components.joblist.request import Request
-        request = Request(self.parent, self.ctx, self.smgr, self.frame, self.ps)
-        request.execute()
-        if getattr(request, 'save_successful', False):
-            self.load_data()
-        
-    def create_quote(self, event):
-        """Create new quote"""
-        self.logger.info("Create Quote clicked")
-        from librepy.jobmanager.components.joblist.quote import Quote
-        quote = Quote(self.parent, self.ctx, self.smgr, self.frame, self.ps)
-        result = quote.execute()
-        self.load_data()
-        
-    def create_job(self, event):
-        """Create new job"""
-        self.logger.info("Create Job clicked")
-        from librepy.jobmanager.components.joblist.job import Job
-        job = Job(self.parent, self.ctx, self.smgr, self.frame, self.ps)
-        job.execute()
-        if getattr(job, 'save_successful', False):
-            self.load_data()
-        
-    def create_invoice(self, event):
-        """Create new invoice"""
-        self.logger.info("Create Invoice clicked")
-        from librepy.jobmanager.components.joblist.invoice import Invoice
-        invoice = Invoice(self.parent, self.ctx, self.smgr, self.frame, self.ps)
-        invoice.execute()
-        if getattr(invoice, 'save_successful', False):
-            self.load_data()
-    
     # Search and sort methods
     def search_data(self, event):
         """Filter grid rows based on search field text"""
