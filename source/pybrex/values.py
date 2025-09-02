@@ -12,7 +12,7 @@ import logging
 PYBREX_NAME = 'Pybrex'
 PYBREX_VERSION = '1.0'
 PYBREX_ID = 'pybrex'
-APP_NAME = 'JobManager'
+APP_NAME = 'OrderManager'
 
 
 def get_dir_path(path):
