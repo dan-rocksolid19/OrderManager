@@ -58,14 +58,7 @@ class AcctTransDAO(BaseDAO):
             )
                  .where((m.transtypecode == self.SALE_ORDER_CODE) & (m.transid == transid))
             )
-            # self.logger.debug(f'query dict {q.__dict__}')
-            # self.logger.debug(f'query sql {q.sql()}')
-            r = q.get()
-            # self.logger.debug(f'query result {r.__dict__}')
-            # self.logger.debug(f'customer {r.org.orgaddress.__dict__}')
-            addr = getattr(r.org, 'orgaddress', None)
-            # self.logger.debug(f'joined addr: {addr.__data__ if addr else None}')
-            return r
+            return q.get()
 
         # Try preferred type first
         o = self.safe_execute(f"fetching SALE order with preferred address type '{preferred_addrtype}' ID {transid}", _q_preferred)
