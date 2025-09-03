@@ -46,8 +46,24 @@ GRAPHICS_DIR = os.path.join(PROGRAM_FILES, 'graphics')
 TOOLBAR_GRAPHICS_DIR = os.path.join(GRAPHICS_DIR, 'toolbar')
 SIDEBAR_GRAPHICS_DIR = os.path.join(GRAPHICS_DIR, 'sidebar')
 
-JASPER_REPORTS_DIR = os.path.join(os.path.split(PROGRAM_FILES)[0], 'jasper_reports', 'templates')
-DOCUMENT_REPORT_PATH = os.path.join(JASPER_REPORTS_DIR, 'Document.jrxml')
+def _resolve_jasper_reports_dir():
+    """
+    Return a real filesystem dir for /jasper_reports/templates.
+
+    Dev:     <parent_of_PROGRAM_FILES>/jasper_reports/templates  (if it exists)
+    Embedded:$(user)/Scripts/python/jasper_reports/templates     (no I/O here)
+    """
+    # Dev candidate right next to your code
+    dev_candidate = os.path.join(os.path.split(PROGRAM_FILES)[0], 'jasper_reports', 'templates')
+    if os.path.isdir(dev_candidate):
+        return dev_candidate
+
+    # Embedded fallback: a real path in the user profile
+    return os.path.join(USER_DIR, 'Scripts', 'python', 'jasper_reports', 'templates')
+
+JASPER_REPORTS_DIR = _resolve_jasper_reports_dir()
+DOCUMENT_REPORT_PATH = os.path.join(JASPER_REPORTS_DIR, 'CalendarEntriesReport.jrxml')
+
 
 # Pybrex Color Scheme
 GRID_HEADER_BG_COLOR = 0x99ccff

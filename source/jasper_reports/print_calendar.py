@@ -6,7 +6,7 @@ from datetime import date, datetime
 from librepy.jobmanager.data.calendar_entry_order_dao import CalendarEntryOrderDAO
 
 logger = pybrex_logger(__name__)
-REPORT_PATH = os.path.join(JASPER_REPORTS_DIR, 'CalendarReport.jrxml')
+REPORT_PATH = os.path.join(JASPER_REPORTS_DIR, 'CalendarEntriesReport.jrxml')
 
 PRINT_ACTION_PRINT = 4
 PRINT_ACTION_PDF = 2

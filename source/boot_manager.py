@@ -57,8 +57,13 @@ class BootManager:
             self.logger.info("BootManager: Running database bootstrap")
             if not ensure_database_ready(self.logger):
                 raise BootError("DATABASE_BOOTSTRAP", "Database configuration or connection failed")
-            
-            # Stage 2: Due reminders check at startup
+
+            # Stage 2: Copy jasper report templates
+            from librepy.jasper_reports.jasper_report_manager import precopy_all_templates
+            precopy_all_templates()
+            self.logger.info("BootManager: Jasper report templates pre-copied")
+
+            # Stage 3: Due reminders check at startup
             self.current_stage = "REMINDER_CHECK"
             try:
                 self.logger.info("BootManager: Checking for due calendar reminders at startup")
@@ -81,13 +86,13 @@ class BootManager:
                 self.logger.error(f"BootManager: Error while checking due reminders: {str(e)}")
                 self.logger.debug(traceback.format_exc())
             
-            # Stage 3: JobManager creation
+            # Stage 4: JobManager creation
             self.current_stage = "JOBMANAGER_INIT"
             self.logger.info("BootManager: Creating JobManager")
             from librepy.jobmanager.command_ctr.main import JobManager
             jobmanager = JobManager(self.ctx, self.smgr)
             
-            # Stage 4: Verify initialization completed
+            # Stage 5: Verify initialization completed
             self.current_stage = "VERIFICATION"
             if not hasattr(jobmanager, '_initialization_complete') or not jobmanager._initialization_complete:
                 raise BootError("VERIFICATION", "JobManager initialization did not complete properly")
