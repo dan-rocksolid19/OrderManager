@@ -118,6 +118,18 @@ class JobList(ctr_container.Container):
             search_x_field, control_y,
             search_field_width, control_height
         )
+        
+        # Wire dynamic search: per-keystroke with debounce
+        try:
+            # Initialize search timer holder
+            self._search_timer = None
+            # Debounced text-change handler
+            self.listeners.add_text_listener(self.edt_search_field, callback=self._on_search_text_changed)
+            # Optional: Enter key triggers immediate search
+            self.listeners.add_key_listener(self.edt_search_field, pressed=self.on_search_key_pressed)
+        except Exception:
+            # Fallback: ignore if listeners not available
+            pass
 
         # Create search button
         self.btn_search = self.add_button(
@@ -170,11 +182,68 @@ class JobList(ctr_container.Container):
         try:
             query = ""
             if hasattr(self, 'edt_search_field'):
-                query = self.edt_search_field.getText().strip()
+                # Prefer Text attr if present (UNO controls), else use getText()
+                query = getattr(self.edt_search_field, 'Text', None)
+                if query is None:
+                    query = self.edt_search_field.getText()
+                query = (query or "").strip()
             self.logger.info(f"Search clicked with query: '{query}'")
             self.load_data(query if query else None)
         except Exception as e:
             self.logger.error(f"Error during search: {e}")
+            self.logger.error(traceback.format_exc())
+    
+    def on_search_key_pressed(self, event):
+        """Handle Enter key in search field to trigger immediate search."""
+        try:
+            key = getattr(event, 'KeyCode', None)
+            if key in (13, 1280):
+                # Trigger immediate search
+                self.search_data(event)
+        except Exception:
+            pass
+
+    def _on_search_text_changed(self, event=None):
+        """Debounce text changes and then filter orders."""
+        try:
+            import threading
+            # cancel previous timer if exists
+            if getattr(self, '_search_timer', None):
+                try:
+                    self._search_timer.cancel()
+                except Exception:
+                    pass
+            # schedule filtering after 250ms
+            self._search_timer = threading.Timer(0.25, self.filter_orders)
+            self._search_timer.daemon = True
+            self._search_timer.start()
+        except Exception:
+            # Fallback: filter immediately
+            self.filter_orders()
+
+    def _read_search_text(self):
+        try:
+            if not hasattr(self, 'edt_search_field'):
+                return ""
+            txt = getattr(self.edt_search_field, 'Text', None)
+            if txt is None:
+                txt = self.edt_search_field.getText()
+            return (txt or "").strip()
+        except Exception:
+            return ""
+
+    def filter_orders(self, event=None):
+        """Apply current search text to the grid (case-insensitive)."""
+        try:
+            search_text = self._read_search_text()
+            if not search_text:
+                self.load_data(None)
+            else:
+                # Allow simple cleanup akin to example (remove commas)
+                search_text = search_text.replace(',', '').strip()
+                self.load_data(search_text)
+        except Exception as e:
+            self.logger.error(f"Error during dynamic filter: {e}")
             self.logger.error(traceback.format_exc())
     
     def sort_data(self, event):
@@ -190,12 +259,18 @@ class JobList(ctr_container.Container):
 
             # Apply search filter if provided
             if search_query:
-                search_lower = search_query.lower()
+                search_lower = str(search_query).lower().strip()
                 filtered = []
                 for row in data:
+                    ref = str(row.get("referencenumber", "")).lower()
+                    org = str(row.get("orgname", "")).lower()
+                    phone = str(row.get("phone", "")).lower()
+                    transid = str(row.get("transid", "")).lower()
                     if (
-                        search_lower in str(row.get("referencenumber", "")).lower()
-                        or search_lower in str(row.get("orgname", "")).lower()
+                        search_lower in ref
+                        or search_lower in org
+                        or search_lower in phone
+                        or search_lower in transid
                     ):
                         filtered.append(row)
                 data = filtered
