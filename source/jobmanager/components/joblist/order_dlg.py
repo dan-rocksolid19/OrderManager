@@ -26,9 +26,9 @@ class OrderDialog(dialog.DialogBase):
                 )
         except Exception:
             pass
-    POS_SIZE = (0, 0, 500, 280)
-    MARGIN = 10
-    LABEL_HEIGHT = 12
+    POS_SIZE = (0, 0, 520, 340)
+    MARGIN = 12
+    LABEL_HEIGHT = 14
     TITLE_COLOR = 0x2B579A
 
     # def __init__(self, ctx, parent, logger, order_id: int, **props):
@@ -224,11 +224,12 @@ class OrderDialog(dialog.DialogBase):
             except Exception:
                 pass
             self._set_create_btn_visible(False)
+        # Build display structures for rendering
+        self._display_kv = []
+        self._display_addr = []
+        self._display_notes = ''
         if not self.order:
-            lines = [
-                f"Order #: {self.order_id}",
-                "Status: Not found or not a SALE order",
-            ]
+            self._display_kv += [("Order #", str(self.order_id)), ("Status", "Not found or not a SALE order")]
             try:
                 if hasattr(self, 'logger') and self.logger:
                     self.logger.warning(f"OrderDialog._prepare: Order not found for id {self.order_id}")
@@ -320,47 +321,27 @@ class OrderDialog(dialog.DialogBase):
                 except Exception:
                     pass
 
-            lines = [
-                f"Order #: {transid}",
-                f"Date: {transdate}",
-                f"Reference: {referencenumber}",
-                f"Customer: {orgname}",
-                f"Phone: {phone}",
+            self._display_kv += [
+                ("Order #", str(transid)),
+                ("Date", transdate),
+                ("Reference", referencenumber),
+                ("Customer", orgname),
+                ("Phone", phone),
             ]
             if addr_lines:
-                lines.append("Address:")
-                lines.extend(addr_lines)
-            lines.extend(["", f"Notes: {notes}"])
+                self._display_addr = addr_lines
+            self._display_notes = notes or ''
 
             try:
                 if hasattr(self, 'logger') and self.logger:
                     self.logger.debug(f"OrderDialog._prepare: Loaded order transid={transid}, reference='{referencenumber}'")
             except Exception:
                 pass
-        # Update label safely with buffering if label not yet created
-        final_text = "\n".join(lines)
+        # Render content now that data is ready
         try:
-            if hasattr(self, 'logger') and self.logger:
-                self.logger.debug("OrderDialog._prepare: Final label text to apply:\n" + final_text)
-                self.logger.debug(f"OrderDialog._prepare: lbl_body ready={bool(getattr(self, 'lbl_body', None) and hasattr(self.lbl_body, 'Model'))}")
+            self._render_content()
         except Exception:
             pass
-        try:
-            if getattr(self, 'lbl_body', None) is not None and hasattr(self.lbl_body, 'Model'):
-                self.lbl_body.Model.Label = final_text
-                self._pending_label_text = None
-                if hasattr(self, 'logger') and self.logger:
-                    self.logger.debug("OrderDialog._prepare: Applied label to lbl_body")
-            else:
-                self._pending_label_text = final_text
-                if hasattr(self, 'logger') and self.logger:
-                    self.logger.debug("OrderDialog._prepare: lbl_body not ready; buffered label text")
-        except Exception as e:
-            try:
-                if hasattr(self, 'logger') and self.logger:
-                    self.logger.error(f"OrderDialog._prepare: Failed to update label: {e}")
-            except Exception:
-                pass
         # Lifecycle log end
         self._log_lifecycle('prepare:end')
 
@@ -378,64 +359,74 @@ class OrderDialog(dialog.DialogBase):
         )
         y += self.LABEL_HEIGHT + 12
 
-        # Body placeholder label; will be populated in _prepare
-        self.lbl_body = self.add_label(
-            'LblBody', x, y, width, self.LABEL_HEIGHT * 10,
-            Label='Loading…', MultiLine=True, FontHeight=11, Align=0
-        )
-        # If _prepare ran earlier and buffered text, apply it now
-        try:
-            if getattr(self, '_pending_label_text', None) is not None and hasattr(self.lbl_body, 'Model'):
-                self.lbl_body.Model.Label = self._pending_label_text
-                if hasattr(self, 'logger') and self.logger:
-                    self.logger.debug("OrderDialog._create: Applied buffered label text to lbl_body")
-                self._pending_label_text = None
-        except Exception:
-            pass
+        # Store content area for dynamic rendering later
+        self._content_x = x
+        self._content_y = y
+        self._content_width = width
 
-        # Create Calendar Entry button under the body label
-        y_btn = y + self.LABEL_HEIGHT * 10 + 10
-        spacing = 10
-        create_w, create_h = 160, 22
-        ok_w, ok_h = 60, 20
-
-        self.btn_create_cal = self.add_button(
-            'CreateCalEntryBtn', x, y_btn, create_w, create_h,
-            Label='Create Calendar Entry',
-            callback=self.open_calendar_entry
-        )
-        # Apply visibility computed in _prepare (or keep default False)
+        # Render content if _prepare already populated structures
         try:
-            self._set_create_btn_visible(bool(getattr(self, '_show_create_cal_btn', False)))
-        except Exception:
-            # Ensure we do not crash UI creation due to visibility issues
-            if hasattr(self, 'logger') and self.logger:
-                try:
-                    self.logger.error("OrderDialog._create: error applying button visibility via helper")
-                    self.logger.error(traceback.format_exc())
-                except Exception:
-                    pass
-        try:
-            if hasattr(self, 'logger') and self.logger:
-                self.logger.info(f"OrderDialog: Added 'Create Calendar Entry' button at x={x}, y={y_btn}; visible={bool(getattr(self,'_show_create_cal_btn', False))}")
-        except Exception:
-            pass
-
-        default_ok_x = int(self.POS_SIZE[2] / 2 - ok_w / 2)
-        ok_x = (x + create_w + spacing) if bool(getattr(self, '_show_create_cal_btn', False)) else default_ok_x
-        self.ok_btn = self.add_button(
-            'OkButton', ok_x, y_btn,
-            ok_w, ok_h, Label='OK',
-            PushButtonType=2
-        )
-
-        # Ensure initial layout is applied (in case _prepare runs later)
-        try:
-            self._layout_buttons(show_create)
+            if hasattr(self, '_display_kv'):
+                self._render_content()
         except Exception:
             pass
 
         self._log_lifecycle('create:end')
+
+    def _render_content(self):
+        # Clear existing dynamic controls is not supported here; we assume first render
+        x = getattr(self, '_content_x', self.MARGIN)
+        y = getattr(self, '_content_y', self.MARGIN + self.LABEL_HEIGHT + 12)
+        width = getattr(self, '_content_width', self.POS_SIZE[2] - self.MARGIN * 2)
+
+        label_w, gap = 130, 2
+        value_w = width - label_w - gap
+        row_h, font_h = self.LABEL_HEIGHT + 6, 12
+
+        # Key-Value rows
+        for i, (k, v) in enumerate(getattr(self, '_display_kv', [])):
+            self.add_label(f'Lbl_{i}_K', x, y, label_w, row_h, Label=f'{k}:', FontHeight=font_h, FontWeight=150)
+            self.add_label(f'Lbl_{i}_V', x + label_w + gap, y, value_w, row_h, Label=str(v or ''), FontHeight=font_h)
+            y += row_h + 2
+
+        # Address section
+        self.add_label('LblAddressTitle', x, y + 6, width, row_h, Label='Address', FontHeight=font_h, FontWeight=150)
+        y += row_h + 8
+        items = getattr(self, '_display_addr', [])
+        if items:
+            for j, line in enumerate(items):
+                self.add_label(f'LblAddr_{j}', x + 12, y, width - 12, row_h, Label=f'- {line}', FontHeight=font_h)
+                y += row_h + 2
+        else:
+            self.add_label('LblAddrNone', x + 12, y, width - 12, row_h, Label='(none)', FontHeight=font_h)
+            y += row_h + 2
+
+        # Notes section
+        self.add_label('LblNotesTitle', x, y + 6, width, row_h, Label='Notes', FontHeight=font_h, FontWeight=150)
+        y += row_h + 8
+        notes_text = getattr(self, '_display_notes', '') or '(none)'
+        self.add_label('LblNotes', x + 12, y, width - 12, row_h, Label=notes_text, FontHeight=font_h)
+        y += row_h + 2
+
+        # Buttons group (secondary + primary) centered
+        y_btn = y + 14
+        bw, bh, bs = 140, 25, 10
+        total_w = bw + bs + 90
+        start_x = int(self.POS_SIZE[2] / 2 - total_w / 2)
+
+        # Secondary: Create Calendar Entry (only visible when allowed)
+        self.btn_create_cal = self.add_button('CreateCalEntryBtn', start_x, y_btn, bw, bh,
+                                              Label='Create Calendar Entry', BackgroundColor=0x808080, TextColor=0xFFFFFF,
+                                              callback=self.open_calendar_entry)
+        # Apply visibility decided in _prepare
+        try:
+            self._set_create_btn_visible(bool(getattr(self, '_show_create_cal_btn', False)))
+        except Exception:
+            pass
+
+        # Primary: OK
+        self.ok_btn = self.add_button('OkButton', start_x + bw + bs, y_btn, 90, bh,
+                                      Label='OK', BackgroundColor=0x2C3E50, TextColor=0xFFFFFF, PushButtonType=2)
 
     def _dispose(self):
         pass
