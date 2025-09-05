@@ -294,30 +294,40 @@ class OrderDialog(dialog.DialogBase):
                 except Exception:
                     pass
 
+                # We want a single compact line: "street, city | state, zip"
+                left = ''
+                right = ''
                 if street:
-                    addr_lines.append(street)
-                # City, State ZIP
-                parts = []
-                if city:
-                    parts.append(city)
-                cs = ''
-                if state:
-                    cs = state
-                if zip_code:
-                    cs = f"{cs} {zip_code}".strip()
-                if parts or cs:
-                    if parts and cs:
-                        addr_lines.append(f"{parts[0]}, {cs}")
-                    elif parts:
-                        addr_lines.append(parts[0])
-                    elif cs:
-                        addr_lines.append(cs)
-                if country:
-                    addr_lines.append(country)
+                    left = street.strip()
+                # Build right part as "city | state, zip" but keep separators only when data exists
+                city_part = (city or '').strip()
+                state_part = (state or '').strip()
+                zip_part = (zip_code or '').strip()
+                state_zip = ''
+                if state_part and zip_part:
+                    state_zip = f"{state_part}, {zip_part}"
+                elif state_part:
+                    state_zip = state_part
+                elif zip_part:
+                    state_zip = zip_part
+                if city_part and state_zip:
+                    right = f"{city_part} | {state_zip}"
+                elif city_part:
+                    right = city_part
+                elif state_zip:
+                    right = state_zip
+                # Compose final line, adding comma between left and right only if both exist
+                final_line = ''
+                if left and right:
+                    final_line = f"{left}, {right}"
+                else:
+                    final_line = left or right
+                if final_line:
+                    addr_lines.append(final_line)
 
                 try:
                     if hasattr(self, 'logger') and self.logger:
-                        self.logger.debug(f"OrderDialog._prepare: Formatted address lines: {addr_lines}")
+                        self.logger.debug(f"OrderDialog._prepare: Formatted address line: {addr_lines}")
                 except Exception:
                     pass
 
@@ -398,7 +408,7 @@ class OrderDialog(dialog.DialogBase):
                 self.add_label(f'LblAddr_{j}', x + 12, y, width - 12, row_h, Label=f'- {line}', FontHeight=font_h)
                 y += row_h + 2
         else:
-            self.add_label('LblAddrNone', x + 12, y, width - 12, row_h, Label='(none)', FontHeight=font_h)
+            self.add_label('LblAddrNone', x + 12, y, width - 12, row_h, Label='No addresses found', FontHeight=font_h)
             y += row_h + 2
 
         # Notes section
