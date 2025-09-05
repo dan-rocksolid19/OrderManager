@@ -104,10 +104,9 @@ class JobList(ctr_container.Container):
         )
         
         # Search field and button
-        control_y = 170
-        control_height = 35
-
-        search_field_width = 200
+        control_y = 95
+        control_height = 30
+        search_field_width = 300
         search_button_width = 100
         left_margin = 25
         search_x_field = left_margin
@@ -135,7 +134,7 @@ class JobList(ctr_container.Container):
         )
         
         # Data grid
-        grid_y = 220
+        grid_y = 150
         grid_height = self.window_height - grid_y - 50
         
         self.data_grid, self.data_grid_model = self.add_grid(
@@ -368,16 +367,15 @@ class JobList(ctr_container.Container):
         title_height = 40
         
         # Search field and button
-        control_y = 170
-        control_height = 35
+        control_y = 95
+        control_height = 30
 
-        search_field_width = 200
+        search_field_width = 300
         search_x_field = 25
         search_x_button = search_x_field + search_field_width + 5
 
-        # Data grid
         grid_x = 25
-        grid_y = 220
+        grid_y = 150
         grid_width = self.window_width - 50  # Leave margin on both sides
         grid_height = self.window_height - grid_y - 50
         
