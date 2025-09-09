@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import List, Dict, Optional, Tuple, Set, Any
-from collections import defaultdict, deque
+from typing import List, Dict, Optional, Tuple, Any
 
 # Minimal logger protocol
 class _Logger:
@@ -49,6 +48,9 @@ class Config:
     max_cascade: Optional[int] = None
     immovable_flag: str = "lock_dates"
     dry_run: bool = False
+    # Lock cascade to a single direction if desired
+    sticky_direction: bool = False
+    cascade_direction: Optional[str] = None
 
 
 def _overlaps(a: Tuple[date, date], b: Tuple[date, date]) -> bool:
@@ -106,6 +108,10 @@ def plan_moves(existing_events: List[dict], new_event: dict, logger: Optional[_L
         except Exception:
             pass
 
+    # Sticky cascade direction setup
+    cascade_dir: Optional[str] = getattr(cfg, 'cascade_direction', None)
+    sticky: bool = bool(getattr(cfg, 'sticky_direction', False))
+
     # Build Event list from existing
     events: List[Event] = []
     for d in existing_events:
@@ -113,6 +119,11 @@ def plan_moves(existing_events: List[dict], new_event: dict, logger: Optional[_L
             continue
         e = Event.from_dict(d)
         events.append(e)
+    # Deterministic iteration for first-move locking
+    try:
+        events.sort(key=lambda ev: (ev.start, ev.end, str(ev.id)))
+    except Exception:
+        pass
     if logger:
         try:
             logger.debug(f"plan_moves: {len(events)} existing events considered")
@@ -121,26 +132,32 @@ def plan_moves(existing_events: List[dict], new_event: dict, logger: Optional[_L
 
     # Proposed map id -> (start, end)
     proposed: Dict[Any, Tuple[date, date]] = {e.id: (e.start, e.end) for e in events}
-    id_to_event: Dict[Any, Event] = {e.id: e for e in events}
 
     moves: List[Move] = []
     steps = 0
 
-    # Track per-event seen positions to detect circular rescheduling
-    seen_positions: Dict[Any, Set[Tuple[date, date]]] = {e.id: {(e.start, e.end)} for e in events}
-    # Additional runaway detectors
-    moves_per_event: Dict[Any, int] = defaultdict(int)
-    recent_ids: deque = deque(maxlen=8)
+    # Note: sticky-direction prevents geometric circular rescheduling; keeping only max_cascade as a global guard.
 
     # BFS queue of anchors; treat NEW as synthetic anchor first
     queue: List[Tuple[Any, Tuple[date, date]]] = [("NEW", new_anchor)]
-    visited: Set[Tuple[Any, date, date]] = {("NEW", new_anchor[0], new_anchor[1])}
+    visited: set = {("NEW", new_anchor[0], new_anchor[1])}
+    # Track ids currently queued to avoid duplicate anchors for the same id
+    in_queue_ids: set = {"NEW"}
 
     def enqueue(eid: Any, interval: Tuple[date, date]):
+        # Do not enqueue duplicate ids; when it pops, we will refresh to latest proposed interval
+        if eid in in_queue_ids:
+            if logger:
+                try:
+                    logger.debug(f"plan_moves: skip enqueue for id={eid} (already in queue); latest interval will be used on pop")
+                except Exception:
+                    pass
+            return
         t = (eid, interval[0], interval[1])
         if t not in visited:
             queue.append((eid, interval))
             visited.add(t)
+            in_queue_ids.add(eid)
             if logger:
                 try:
                     logger.debug(f"plan_moves: enqueue anchor id={eid} interval={interval}")
@@ -149,6 +166,15 @@ def plan_moves(existing_events: List[dict], new_event: dict, logger: Optional[_L
 
     while queue:
         anchor_id, a_int = queue.pop(0)
+        # Mark id as no longer in queue so it can be enqueued again after it moves
+        if anchor_id in in_queue_ids:
+            try:
+                in_queue_ids.remove(anchor_id)
+            except Exception:
+                pass
+        # Refresh anchor interval to the latest proposed state for this id (if any)
+        if anchor_id != "NEW" and anchor_id in proposed:
+            a_int = proposed.get(anchor_id, a_int)
         aS, aE = a_int
         if logger:
             try:
@@ -171,8 +197,18 @@ def plan_moves(existing_events: List[dict], new_event: dict, logger: Optional[_L
                     except Exception:
                         pass
                 continue
-            # Direction
-            dirn = _choose_direction(cfg.policy, a_int, cur, e.duration)
+            # Direction with sticky enforcement
+            if sticky and cascade_dir:
+                dirn = cascade_dir
+            else:
+                dirn = _choose_direction(cfg.policy, a_int, cur, e.duration)
+                if sticky and cascade_dir is None:
+                    cascade_dir = dirn
+                    if logger:
+                        try:
+                            logger.debug(f"plan_moves: sticky cascade_dir locked to '{cascade_dir}' on first move (anchor={anchor_id})")
+                        except Exception:
+                            pass
             if dirn == 'forward':
                 new_start = aE + timedelta(days=1)
                 new_end = new_start + timedelta(days=e.duration - 1)
@@ -190,24 +226,6 @@ def plan_moves(existing_events: List[dict], new_event: dict, logger: Optional[_L
             if (new_start, new_end) == cur:
                 continue
 
-            # Circular detection: if this event already visited this target interval during this run, treat as circular and fail
-            sp = seen_positions.setdefault(e.id, set())
-            if (new_start, new_end) in sp:
-                msg = f"Circular reschedule detected for event {e.id} targeting {new_start}..{new_end}"
-                if logger:
-                    logger.error(msg)
-                return False, moves, msg
-
-            # Locked events are skipped earlier; this path should be unreachable now.
-            # Keeping a defensive check but treating it as a skip to allow overlap.
-            if e.locked:
-                if logger:
-                    try:
-                        logger.debug(f"plan_moves: (defensive) encountered locked id={e.id}; allowing overlap and skipping move")
-                    except Exception:
-                        pass
-                continue
-
             steps += 1
             if cfg.max_cascade is not None and steps > cfg.max_cascade:
                 msg = f"Cascade exceeded limit {cfg.max_cascade}"
@@ -215,36 +233,8 @@ def plan_moves(existing_events: List[dict], new_event: dict, logger: Optional[_L
                     logger.error(msg)
                 return False, moves, msg
 
-            # Runaway detection: per-event move cap
-            moves_per_event[e.id] += 1
-            if moves_per_event[e.id] > (len(events) + 1):
-                msg = f"Circular reschedule detected: event {e.id} moved too many times"
-                if logger:
-                    logger.error(msg)
-                return False, moves, msg
-
-            # Ping-pong detection using recent id window
-            recent_ids.append(e.id)
-            if len(recent_ids) == recent_ids.maxlen:
-                uniq = list(set(recent_ids))
-                if len(uniq) == 2:
-                    a0, b0 = recent_ids[0], recent_ids[1]
-                    if a0 != b0:
-                        alternating = True
-                        for i, vid in enumerate(recent_ids):
-                            expect = a0 if (i % 2 == 0) else b0
-                            if vid != expect:
-                                alternating = False
-                                break
-                        if alternating:
-                            msg = "Circular reschedule detected: two-node ping-pong"
-                            if logger:
-                                logger.error(msg)
-                            return False, moves, msg
-
             moves.append(Move(e.id, cur[0], cur[1], new_start, new_end))
             proposed[e.id] = (new_start, new_end)
-            sp.add((new_start, new_end))
             enqueue(e.id, (new_start, new_end))
 
     if logger:
