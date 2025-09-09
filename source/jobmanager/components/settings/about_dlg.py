@@ -47,7 +47,7 @@ class AboutDialog(dialog.DialogBase):
             )
 
             y += self.LABEL_HEIGHT * 3 + 8
-            credits = 'Developed by RockSolid Data Solutions\nFor Farview Concrete\nContact: sales@rocksoliddata.solutions | 620-888-7050'
+            credits = 'Developed by RockSolid Data Solutions\nFor Anthony Lead\nContact: sales@rocksoliddata.solutions | 620-888-7050'
             self.add_label(
                 'LblCredits',
                 x, y,
