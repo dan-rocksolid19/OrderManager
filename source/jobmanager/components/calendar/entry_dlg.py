@@ -5,6 +5,57 @@ from librepy.pybrex.uno_date_time_converters import uno_date_to_python, python_d
 from librepy.jobmanager.data.status_dao import StatusDAO
 
 
+class RescheduleChoiceDialog(DialogBase):
+    POS_SIZE = 0, 0, 360, 180
+    DISPOSE = True
+
+    def __init__(self, ctx, smgr, title: str, message: str, parent=None, **props):
+        self.choice = None
+        self._title = title
+        self._message = message
+        self._parent = parent
+        super().__init__(ctx, smgr, **props)
+
+    def _create(self):
+        # Basic window
+        self._dialog.Title = self._title or "Confirm Reschedule"
+        # Message label
+        x, y, w, h = 10, 15, self.POS_SIZE[2] - 20, 60
+        self.add_label("MessageLabel", x, y, w, h, Label=self._message, MultiLine=True)
+        # Buttons
+        bw, bh, bs = 90, 24, 10
+        total_w = bw * 3 + bs * 2
+        btn_y = self.POS_SIZE[3] - bh - 20
+        start_x = (self.POS_SIZE[2] - total_w) // 2
+        # Continue (default)
+        self.btn_continue = self.add_button(
+            "ContinueBtn", start_x, btn_y, bw, bh, Label="Continue",
+            callback=self._on_continue, BackgroundColor=0x2E7D32, TextColor=0xFFFFFF
+        )
+        # Continue without reschedule
+        self.btn_no_res = self.add_button(
+            "NoResBtn", start_x + bw + bs, btn_y, bw, bh, Label="Continue without reschedule",
+            callback=self._on_continue_no_res, BackgroundColor=0x607D8B, TextColor=0xFFFFFF
+        )
+        # Cancel
+        self.btn_cancel = self.add_button(
+            "CancelBtn", start_x + (bw + bs) * 2, btn_y, bw, bh, Label="Cancel",
+            callback=self._on_cancel, BackgroundColor=0x808080, TextColor=0xFFFFFF
+        )
+
+    def _on_continue(self, event=None):
+        self.choice = "continue"
+        self.end_execute(1)
+
+    def _on_continue_no_res(self, event=None):
+        self.choice = "continue_no_reschedule"
+        self.end_execute(1)
+
+    def _on_cancel(self, event=None):
+        self.choice = "cancel"
+        self.end_execute(0)
+
+
 class EntryDialog(DialogBase):
     POS_SIZE = 0, 0, 360, 320
     DISPOSE = True
@@ -131,6 +182,25 @@ class EntryDialog(DialogBase):
                 return sid
         return None
 
+    def confirm_reschedule_choice(self, message: str, title: str) -> str:
+        try:
+            dlg = RescheduleChoiceDialog(self.ctx, self.smgr, title=title, message=message, parent=self)
+            dlg.execute()
+            choice = dlg.choice or "cancel"
+            # Log choice here if logger exists
+            if self.logger:
+                if choice == "continue":
+                    self.logger.info("User chose to reschedule followers")
+                elif choice == "continue_no_reschedule":
+                    self.logger.info("User chose to update target only")
+                else:
+                    self.logger.info("User canceled update")
+            return choice
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Error showing reschedule choice dialog: {e}")
+            return "cancel"
+
     def save_entry(self, event=None):
         title = self.title_edit.Text.strip()
         sd_uno = self.start_date.getDate()
@@ -213,9 +283,19 @@ class EntryDialog(DialogBase):
                     first_start = preview.get('first_start')
                     last_start = preview.get('last_start')
                     msg = (
-                        f"This update will reschedule {count} entries from {first_start} to {last_start}. Continue?"
+                        f"This update will reschedule {count} entries from {first_start} to {last_start} unless dates are locked."
                     )
-                    if not confirm_action(msg, "Confirm Reschedule"):
+                    choice = self.confirm_reschedule_choice(msg, "Confirm Reschedule")
+                    if choice == "cancel":
+                        return
+                    if choice == "continue_no_reschedule":
+                        # Update only the target entry and skip scheduler
+                        updated = dao.update_entry(entry_id, self.entry_result)
+                        if not updated:
+                            msgbox("Failed to save changes to the entry.", "Error")
+                            return
+                        self.logger.info("EntryDialog.save_entry: updated target entry only (no reschedule)")
+                        self.end_execute(1)
                         return
                 moves = scheduler.apply_block_shift(
                     dao=dao,
