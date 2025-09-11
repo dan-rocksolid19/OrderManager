@@ -25,65 +25,24 @@ class CalendarEntryOrderDAO(BaseDAO):
 
     def get_entries_by_date_range(self, start_date, end_date):
         """
-        List CalendarEntryOrder rows that overlap the [start_date, end_date] range.
+        List CalendarEntryOrder rows with start_date within [start_date, end_date].
+        Overlap checks are no longer applied. All filtering is performed in SQL via Peewee.
         Returns UI-friendly dicts that the calendar can expand per-day.
         """
         def _query():
             q = self._q()
             # Keep entries with no order OR with order type 'SALEORD'
             type_pred = (CalendarEntryOrder.order.is_null(True)) | (AcctTrans.transtypecode == 'SALEORD')
-            # Broad DB-side predicate on start_date to reduce rows; detailed overlap check in Python
-            q = q.where(type_pred & (CalendarEntryOrder.start_date <= end_date))
 
-            items = []
-            for e in q:
-                s = e.start_date
-                eend = e.end_date or e.start_date
-                if s is None:
-                    continue
-                # Overlap check: [s, eend] intersects [start_date, end_date]
-                if not (s <= end_date and eend >= start_date):
-                    continue
+            date_pred = (
+                CalendarEntryOrder.start_date.is_null(False) &
+                (CalendarEntryOrder.start_date >= start_date) &
+                (CalendarEntryOrder.start_date <= end_date)
+            )
 
-                # IMPORTANT: guard against NULL FK; do not dereference e.order when order_id is None
-                order_id = getattr(e, 'order_id', None)
-                orgname = ''
-                refer = ''
-                if order_id is not None:
-                    order_obj = getattr(e, 'order', None)
-                    if order_obj is not None:
-                        refer = getattr(order_obj, 'referencenumber', '') or ''
-                        org_obj = getattr(order_obj, 'org', None)
-                        orgname = getattr(org_obj, 'orgname', '') if org_obj else ''
+            q = q.where(type_pred & date_pred)
 
-                # Status details
-                status_id = getattr(e, 'status_id', None)
-                status_name = ''
-                status_color = ''
-                status_obj = getattr(e, 'status', None)
-                if status_obj is not None:
-                    status_name = getattr(status_obj, 'status', '') or ''
-                    status_color = getattr(status_obj, 'color', '') or ''
-
-                items.append({
-                    'id': e.entry_id,
-                    'title': e.event_name or '',
-                    'start_date': s,
-                    'end_date': eend,
-                    'description': e.event_description or '',
-                    'order_id': order_id,
-                    'orgname': orgname,
-                    'referencenumber': refer,
-                    'type': 'order_entry',
-                    'reminder': bool(getattr(e, 'reminder', False)),
-                    'days_before': getattr(e, 'days_before', None),
-                    'lock_dates': bool(getattr(e, 'lock_dates', False)),
-                    'fixed_dates': bool(getattr(e, 'fixed_dates', False)),
-                    'status_id': status_id,
-                    'status': status_name,
-                    'status_color': status_color,
-                })
-            return items
+            return [self._to_dict(e) for e in q]
 
         return self.safe_execute(
             f"listing CalendarEntryOrder in range {start_date}..{end_date}",
