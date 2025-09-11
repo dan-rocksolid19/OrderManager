@@ -198,7 +198,7 @@ class EntryDialog(DialogBase):
         else:
             # Edit mode: only reschedule neighbors when dates changed
             from librepy.jobmanager.data.calendar_entry_order_dao import CalendarEntryOrderDAO
-            from librepy.jobmanager.components.calendar import scheduler
+            from librepy.jobmanager.components.calendar import job_scheduler as scheduler
 
             dao = CalendarEntryOrderDAO(self.logger)
             entry_id = self.entry_data.get('id') if self.entry_data else None
@@ -223,21 +223,11 @@ class EntryDialog(DialogBase):
                     return
                 self.logger.info(f"EntryDialog.save_entry: updated entry_id={entry_id} (no date change)")
             else:
-                intent_dir = None
-                try:
-                    if new_sd and orig_ed and new_sd > orig_ed:
-                        intent_dir = 'forward'
-                    elif new_ed and orig_sd and new_ed < orig_sd:
-                        intent_dir = 'backward'
-                except Exception:
-                    intent_dir = None
-
-                ok, applied_moves, err = scheduler.update_with_reschedule(
+                ok, applied_moves, err = scheduler.apply_block_shift(
                     dao=dao,
                     entry_id=entry_id,
                     updated_data=self.entry_result,
-                    logger=self.logger,
-                    cfg=scheduler.Config(policy='forward', sticky_direction=True, cascade_direction=intent_dir)
+                    logger=self.logger
                 )
                 if not ok:
                     # Show a friendlier message if we detected a circular reschedule
