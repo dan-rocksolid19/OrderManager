@@ -223,20 +223,17 @@ class EntryDialog(DialogBase):
                     return
                 self.logger.info(f"EntryDialog.save_entry: updated entry_id={entry_id} (no date change)")
             else:
-                ok, applied_moves, err = scheduler.apply_block_shift(
-                    dao=dao,
-                    entry_id=entry_id,
-                    updated_data=self.entry_result,
-                    logger=self.logger
-                )
-                if not ok:
-                    # Show a friendlier message if we detected a circular reschedule
-                    if err and isinstance(err, str) and 'circular' in err.lower():
-                        msgbox("Rescheduling was not possible due to circular rescheduling detected.", "Scheduling Error")
-                    else:
-                        msgbox(f"Cannot reschedule due to conflicts: {err}", "Scheduling Error")
+                try:
+                    moves = scheduler.apply_block_shift(
+                        dao=dao,
+                        entry_id=entry_id,
+                        updated_data=self.entry_result,
+                        logger=self.logger
+                    )
+                except scheduler.SchedulerError as e:
+                    msgbox(f"Failed to save changes: {e}", "Error")
                     return
-                self.logger.info(f"EntryDialog.save_entry: rescheduled entry_id={entry_id}; applied {len(applied_moves)} moves")
+                self.logger.info(f"EntryDialog.save_entry: rescheduled entry_id={entry_id}; applied {len(moves)} moves")
 
         self.logger.debug(f"EntryDialog.save_entry: payload={self.entry_result}")
         self.end_execute(1)

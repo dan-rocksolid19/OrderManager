@@ -1,5 +1,5 @@
 from datetime import timedelta, date
-from typing import Optional, Tuple, List, Dict, Any
+from typing import Optional, List, Dict, Any
 
 # Minimal logger protocol for typing
 class _Logger:
@@ -21,22 +21,25 @@ class Move:
         return f"Move(id={self.id}, {self.old_start}..{self.old_end} -> {self.new_start}..{self.new_end})"
 
 
-def apply_block_shift(dao, entry_id: int, updated_data: dict, logger: Optional[_Logger] = None) -> Tuple[bool, List[Move], Optional[str]]:
+class SchedulerError(Exception):
+    pass
+
+
+def apply_block_shift(dao, entry_id: int, updated_data: dict, logger: Optional[_Logger] = None) -> List[Move]:
     """
     Block-shift strategy when editing an existing entry.
     Rules:
       - Entries with start_date < orig_start are untouched.
       - If beta = new_end - orig_end is 0 days, only update the edited entry.
       - If beta != 0, shift every entry with start_date >= orig_start by beta days
-        (both start_date and end_date). Respect lock_dates/fixed_dates by skipping them.
-      - Overlaps are allowed. No attempt to resolve.
+        (both start_date and end_date). Overlaps are allowed.
 
-    Returns (ok, applied_moves, err).
+    Returns the list of follower moves applied. Raises SchedulerError on failure.
     """
     # Load current entry
     current = dao.get_entry_by_id(entry_id)
     if not current:
-        return False, [], f"Entry {entry_id} not found"
+        raise SchedulerError(f"Entry {entry_id} not found")
 
     orig_start: date = current.get('start_date')
     orig_end: date = current.get('end_date') or orig_start
@@ -57,71 +60,60 @@ def apply_block_shift(dao, entry_id: int, updated_data: dict, logger: Optional[_
         payload['end_date'] = new_end
         ok = dao.update_entry(entry_id, payload)
         if not ok:
-            return False, [], f"Failed to update entry {entry_id}"
+            raise SchedulerError(f"Failed to update entry {entry_id}")
         if logger:
             try:
                 logger.info(f"apply_block_shift: updated entry_id={entry_id} (beta=0; no follower shifts)")
             except Exception:
                 pass
-        return True, [], None
+        return []
 
     # beta != 0: shift the block of entries with start_date >= orig_start
     if logger:
         try:
-            logger.info(f"apply_block_shift: entry_id={entry_id} beta={beta_days}d; selecting entries with start_date >= {orig_start} (DB-level filtering)")
+            logger.info(f"apply_block_shift: entry_id={entry_id} beta={beta_days}d; followers with start_date >= {orig_start}")
         except Exception:
             pass
 
-    rng_start = orig_start
-    rng_end = new_end + timedelta(days=3650)
+    # Select followers starting on/after original start; exclude locked
     entries: List[Dict[str, Any]] = dao.get_entries_by_date_range(
-        rng_start,
-        rng_end,
+        orig_start,
+        None,
         exclude_locked=True,
     ) or []
 
-    # Deduplicate and ensure target included (if it meets filter it will be updated separately anyway)
-    seen_ids = set()
-    filtered: List[Dict[str, Any]] = []
-    for e in entries:
-        eid = e.get('id')
-        if eid in seen_ids:
-            continue
-        seen_ids.add(eid)
-        filtered.append(e)
-
     applied: List[Move] = []
 
-    # Apply shifts to followers (including any with start inside original interval); do NOT touch entries before orig_start
-    for e in filtered:
-        eid = e.get('id')
-        if eid == entry_id:
-            continue
-        old_s: date = e.get('start_date')
-        old_e: date = e.get('end_date') or old_s
-        new_s = old_s + timedelta(days=beta_days)
-        new_e = old_e + timedelta(days=beta_days)
-        if dao.update_entry(eid, {'start_date': new_s, 'end_date': new_e}):
-            applied.append(Move(eid, old_s, old_e, new_s, new_e))
-            if logger:
-                try:
-                    logger.debug(f"apply_block_shift: shifted id={eid} {old_s}..{old_e} -> {new_s}..{new_e}")
-                except Exception:
-                    pass
-        else:
-            if logger:
-                logger.error(f"apply_block_shift: failed to update follower {eid} to {new_s}..{new_e}")
+    # Transaction: followers + target together
+    with dao.database.transaction():
+        for e in entries:
+            eid = e.get('id')
+            if eid == entry_id:
+                continue
+            old_s: date = e.get('start_date')
+            old_e: date = e.get('end_date') or old_s
+            new_s = old_s + timedelta(days=beta_days)
+            new_e = old_e + timedelta(days=beta_days)
+            if dao.update_entry(eid, {'start_date': new_s, 'end_date': new_e}):
+                applied.append(Move(eid, old_s, old_e, new_s, new_e))
+                if logger:
+                    try:
+                        logger.debug(f"apply_block_shift: shifted id={eid} {old_s}..{old_e} -> {new_s}..{new_e}")
+                    except Exception:
+                        pass
+            else:
+                raise SchedulerError(f"Failed to update follower {eid}")
 
-    payload = dict(updated_data)
-    payload['start_date'] = new_start
-    payload['end_date'] = new_end
-    if not dao.update_entry(entry_id, payload):
-        return False, applied, f"Failed to update target entry {entry_id}"
+        payload = dict(updated_data)
+        payload['start_date'] = new_start
+        payload['end_date'] = new_end
+        if not dao.update_entry(entry_id, payload):
+            raise SchedulerError(f"Failed to update entry {entry_id}")
 
     if logger:
         try:
-            logger.info(f"apply_block_shift: done; target id={entry_id} updated, shifted followers={len(applied)}")
+            logger.info(f"apply_block_shift: target id={entry_id} updated; shifted followers={len(applied)} (beta={beta_days})")
         except Exception:
             pass
 
-    return True, applied, None
+    return applied
