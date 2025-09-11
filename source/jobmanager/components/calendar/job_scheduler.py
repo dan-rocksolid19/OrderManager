@@ -66,39 +66,24 @@ def apply_block_shift(dao, entry_id: int, updated_data: dict, logger: Optional[_
         return True, [], None
 
     # beta != 0: shift the block of entries with start_date >= orig_start
-    # Build a wide range starting at orig_start to fetch potentially affected entries.
-    rng_start = orig_start
-
-    # Add upper bound to include far-future followers
-    rng_end = new_end + timedelta(days=3650)
-
     if logger:
         try:
-            logger.info(f"apply_block_shift: entry_id={entry_id} beta={beta_days}d; selecting entries with start_date >= {orig_start}")
+            logger.info(f"apply_block_shift: entry_id={entry_id} beta={beta_days}d; selecting entries with start_date >= {orig_start} (DB-level filtering)")
         except Exception:
             pass
 
-    # Fetch entries in a wide range, then filter by start_date >= orig_start
-    entries: List[Dict[str, Any]] = dao.get_entries_by_date_range(rng_start, rng_end) or []
-
-    # Ensure we include the target even if not returned by range (should be included though)
-    # Filter: start_date >= orig_start, and skip locked/fixed.
-    to_shift: List[Dict[str, Any]] = []
-    for e in entries:
-        s = e.get('start_date')
-        if not s:
-            continue
-        if s < orig_start:
-            continue
-        # Respect lock/fixed dates: skip if true
-        if bool(e.get('lock_dates', False)):
-            continue
-        to_shift.append(e)
+    rng_start = orig_start
+    rng_end = new_end + timedelta(days=3650)
+    entries: List[Dict[str, Any]] = dao.get_entries_by_date_range(
+        rng_start,
+        rng_end,
+        exclude_locked=True,
+    ) or []
 
     # Deduplicate and ensure target included (if it meets filter it will be updated separately anyway)
     seen_ids = set()
     filtered: List[Dict[str, Any]] = []
-    for e in to_shift:
+    for e in entries:
         eid = e.get('id')
         if eid in seen_ids:
             continue
@@ -111,7 +96,6 @@ def apply_block_shift(dao, entry_id: int, updated_data: dict, logger: Optional[_
     for e in filtered:
         eid = e.get('id')
         if eid == entry_id:
-            # We'll update the edited entry after loop using updated_data; skip here
             continue
         old_s: date = e.get('start_date')
         old_e: date = e.get('end_date') or old_s
@@ -128,7 +112,6 @@ def apply_block_shift(dao, entry_id: int, updated_data: dict, logger: Optional[_
             if logger:
                 logger.error(f"apply_block_shift: failed to update follower {eid} to {new_s}..{new_e}")
 
-    # Finally, update the edited entry to requested new_start/new_end and other fields
     payload = dict(updated_data)
     payload['start_date'] = new_start
     payload['end_date'] = new_end

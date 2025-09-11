@@ -23,10 +23,11 @@ class CalendarEntryOrderDAO(BaseDAO):
              .join(CalendarEntryStatus, join_type=JOIN.LEFT_OUTER, on=(m.status == CalendarEntryStatus.status_id))
         )
 
-    def get_entries_by_date_range(self, start_date, end_date):
+    def get_entries_by_date_range(self, start_date=None, end_date=None, exclude_locked=False):
         """
         List CalendarEntryOrder rows with start_date within [start_date, end_date].
         Overlap checks are no longer applied. All filtering is performed in SQL via Peewee.
+        Optional flags allow excluding rows with lock_dates/fixed_dates set to True.
         Returns UI-friendly dicts that the calendar can expand per-day.
         """
         def _query():
@@ -34,18 +35,25 @@ class CalendarEntryOrderDAO(BaseDAO):
             # Keep entries with no order OR with order type 'SALEORD'
             type_pred = (CalendarEntryOrder.order.is_null(True)) | (AcctTrans.transtypecode == 'SALEORD')
 
-            date_pred = (
-                CalendarEntryOrder.start_date.is_null(False) &
-                (CalendarEntryOrder.start_date >= start_date) &
-                (CalendarEntryOrder.start_date <= end_date)
-            )
+            preds = [CalendarEntryOrder.start_date.is_null(False)]
 
-            q = q.where(type_pred & date_pred)
+            if start_date:
+                preds.append(CalendarEntryOrder.start_date >= start_date)
+            if end_date:
+                preds.append(CalendarEntryOrder.start_date <= end_date)
+            if exclude_locked:
+                preds.append((CalendarEntryOrder.lock_dates == False) | (CalendarEntryOrder.lock_dates.is_null(True)))
+
+            where_expr = type_pred
+            for p in preds:
+                where_expr = where_expr & p
+
+            q = q.where(where_expr)
 
             return [self._to_dict(e) for e in q]
 
         return self.safe_execute(
-            f"listing CalendarEntryOrder in range {start_date}..{end_date}",
+            f"listing CalendarEntryOrder in range {start_date}..{end_date} (exclude_locked={exclude_locked})",
             _query,
             default_return=[]
         )
@@ -199,3 +207,4 @@ class CalendarEntryOrderDAO(BaseDAO):
             obj.delete_instance()
             return True
         return self.safe_execute(f"delete CalendarEntryOrder {entry_id}", _delete, default_return=False)
+
