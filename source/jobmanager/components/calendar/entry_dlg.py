@@ -196,7 +196,7 @@ class EntryDialog(DialogBase):
                 msgbox("Failed to create the calendar entry.", "Error")
                 return
         else:
-            # Edit mode: only reschedule neighbors when dates changed
+            # Edit mode: always delegate to scheduler which handles beta=0 vs beta!=0
             from librepy.jobmanager.data.calendar_entry_order_dao import CalendarEntryOrderDAO
             from librepy.jobmanager.components.calendar import job_scheduler as scheduler
 
@@ -206,34 +206,17 @@ class EntryDialog(DialogBase):
                 msgbox("Missing entry id for edit.", "Error")
                 return
 
-            # Original dates
-            orig_sd = self.entry_data.get('start_date')
-            orig_ed = self.entry_data.get('end_date') or orig_sd
-
-            # New dates
-            new_sd = self.entry_result.get('start_date')
-            new_ed = self.entry_result.get('end_date') or new_sd
-
-            dates_changed = (orig_sd != new_sd) or (orig_ed != new_ed)
-
-            if not dates_changed:
-                ok = dao.update_entry(entry_id, self.entry_result)
-                if not ok:
-                    msgbox("Failed to update the calendar entry.", "Error")
-                    return
-                self.logger.info(f"EntryDialog.save_entry: updated entry_id={entry_id} (no date change)")
-            else:
-                try:
-                    moves = scheduler.apply_block_shift(
-                        dao=dao,
-                        entry_id=entry_id,
-                        updated_data=self.entry_result,
-                        logger=self.logger
-                    )
-                except scheduler.SchedulerError as e:
-                    msgbox(f"Failed to save changes: {e}", "Error")
-                    return
-                self.logger.info(f"EntryDialog.save_entry: rescheduled entry_id={entry_id}; applied {len(moves)} moves")
+            try:
+                moves = scheduler.apply_block_shift(
+                    dao=dao,
+                    entry_id=entry_id,
+                    updated_data=self.entry_result,
+                    logger=self.logger
+                )
+                self.logger.info(f"EntryDialog.save_entry: block-shift applied; shifted followers={len(moves)}")
+            except scheduler.SchedulerError as e:
+                msgbox(f"Failed to save changes: {e}", "Error")
+                return
 
         self.logger.debug(f"EntryDialog.save_entry: payload={self.entry_result}")
         self.end_execute(1)
