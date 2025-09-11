@@ -25,9 +25,12 @@ class CalendarEntryOrderDAO(BaseDAO):
 
     def get_entries_by_date_range(self, start_date=None, end_date=None, exclude_locked=False):
         """
-        List CalendarEntryOrder rows with start_date within [start_date, end_date].
-        Overlap checks are no longer applied. All filtering is performed in SQL via Peewee.
-        Optional flags allow excluding rows with lock_dates/fixed_dates set to True.
+        List CalendarEntryOrder rows that overlap the provided [start_date, end_date] range.
+        Overlap logic:
+          - both bounds: start_date <= end_date AND COALESCE(end_date, start_date) >= start_date
+          - only start bound: COALESCE(end_date, start_date) >= start_date
+          - only end bound: start_date <= end_date
+        Optional flag allows excluding rows with lock_dates set to True.
         Returns UI-friendly dicts that the calendar can expand per-day.
         """
         def _query():
@@ -35,12 +38,18 @@ class CalendarEntryOrderDAO(BaseDAO):
             # Keep entries with no order OR with order type 'SALEORD'
             type_pred = (CalendarEntryOrder.order.is_null(True)) | (AcctTrans.transtypecode == 'SALEORD')
 
+            event_end = fn.COALESCE(CalendarEntryOrder.end_date, CalendarEntryOrder.start_date)
+
             preds = [CalendarEntryOrder.start_date.is_null(False)]
 
-            if start_date:
-                preds.append(CalendarEntryOrder.start_date >= start_date)
-            if end_date:
+            if start_date and end_date:
                 preds.append(CalendarEntryOrder.start_date <= end_date)
+                preds.append(event_end >= start_date)
+            elif start_date:
+                preds.append(event_end >= start_date)
+            elif end_date:
+                preds.append(CalendarEntryOrder.start_date <= end_date)
+
             if exclude_locked:
                 preds.append((CalendarEntryOrder.lock_dates == False) | (CalendarEntryOrder.lock_dates.is_null(True)))
 
