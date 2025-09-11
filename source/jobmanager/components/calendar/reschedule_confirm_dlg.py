@@ -23,20 +23,20 @@ class RescheduleChoiceDialog(DialogBase):
         total_w = bw * 3 + bs * 2
         btn_y = self.POS_SIZE[3] - bh - 20
         start_x = (self.POS_SIZE[2] - total_w) // 2
-        # Continue (default)
-        self.btn_continue = self.add_button(
-            "ContinueBtn", start_x, btn_y, bw, bh, Label="Continue",
-            callback=self._on_continue, BackgroundColor=0x2E7D32, TextColor=0xFFFFFF
-        )
         # Continue without reschedule
         self.btn_no_res = self.add_button(
-            "NoResBtn", start_x + bw + bs, btn_y, bw, bh, Label="Continue without reschedule",
-            callback=self._on_continue_no_res, BackgroundColor=0x607D8B, TextColor=0xFFFFFF
+            "NoResBtn", start_x, btn_y, bw, bh, Label="Continue without reschedule",
+            callback=self._on_continue_no_res, BackgroundColor=0x2E7D32, TextColor=0xFFFFFF
         )
-        # Cancel
+        # Cancel (middle)
         self.btn_cancel = self.add_button(
-            "CancelBtn", start_x + (bw + bs) * 2, btn_y, bw, bh, Label="Cancel",
+            "CancelBtn", start_x + bw + bs, btn_y, bw, bh, Label="Cancel",
             callback=self._on_cancel, BackgroundColor=0x808080, TextColor=0xFFFFFF
+        )
+        # Continue
+        self.btn_continue = self.add_button(
+            "ContinueBtn", start_x + (bw + bs) * 2, btn_y, bw, bh, Label="Continue",
+            callback=self._on_continue, BackgroundColor=0x2C3E50, TextColor=0xFFFFFF
         )
 
     def _on_continue(self, event=None):
