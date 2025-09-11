@@ -207,6 +207,16 @@ class EntryDialog(DialogBase):
                 return
 
             try:
+                preview = scheduler.preview_block_shift(dao, entry_id, self.entry_result)
+                if preview.get('beta_days') != 0 and preview.get('has_followers'):
+                    count = preview.get('count', 0)
+                    first_start = preview.get('first_start')
+                    last_start = preview.get('last_start')
+                    msg = (
+                        f"This update will reschedule {count} entries from {first_start} to {last_start}. Continue?"
+                    )
+                    if not confirm_action(msg, "Confirm Reschedule"):
+                        return
                 moves = scheduler.apply_block_shift(
                     dao=dao,
                     entry_id=entry_id,
